@@ -8,6 +8,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from publicsuffix2 import get_sld, get_tld
+
 
 INPUT_FILE = Path("subdomains.txt")
 TIMEOUT = 5
@@ -45,13 +47,14 @@ def load_hostnames():
         print("Error: subdomains.txt not found.")
         return None
 
-    if not INPUT_FILE.read_text(encoding="utf-8").strip():
+    text = INPUT_FILE.read_text(encoding="utf-8")
+    if not text.strip():
         print("Error: subdomains.txt is empty.")
         return None
 
     hostnames = []
     seen = set()
-    for line in INPUT_FILE.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         hostname = normalize_hostname(line)
         if hostname and hostname not in seen:
             seen.add(hostname)
@@ -64,7 +67,14 @@ def load_hostnames():
 
 
 def get_base_domain(hostnames):
-    domains = {".".join(hostname.split(".")[-2:]) for hostname in hostnames}
+    domains = set()
+    for hostname in hostnames:
+        suffix = get_tld(hostname, strict=True)
+        domain = get_sld(hostname, strict=True)
+        if not suffix or not domain or domain == suffix:
+            return None
+        domains.add(domain)
+
     if len(domains) != 1:
         return None
     return domains.pop()
